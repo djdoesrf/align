@@ -1,264 +1,1999 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Align • Floorplan GPS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
-        body { font-family: 'Inter', system_ui, sans-serif; }
-        .title-font { font-family: 'Space Grotesk', sans-serif; }
-        #map { width: 100%; height: 100%; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; overflow: hidden; }
-        #floorplan { position: absolute; top: 0; left: 0; transform-origin: 0 0; user-select: none; transition: opacity 0.2s ease; pointer-events: auto; }
-        .anchor-marker { position: absolute; width: 26px; height: 26px; border: 3px solid #22c55e; border-radius: 9999px; background: rgba(16,185,129,0.15); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #22c55e; pointer-events: auto; transform: translate(-50%, -50%); box-shadow: 0 0 0 3px rgba(16,185,129,0.2); }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Align • Mobile Floorplan GPS</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #09090b;
+      --panel: rgba(24, 24, 27, 0.94);
+      --panel-2: rgba(39, 39, 42, 0.94);
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
+      --text: #fafafa;
+      --muted: #a1a1aa;
+      --green: #22c55e;
+      --green-2: #16a34a;
+      --danger: #ef4444;
+      --shadow: 0 18px 50px rgba(0,0,0,0.35);
+      --radius: 22px;
+      --drawer-width: min(92vw, 380px);
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+
+    body {
+      min-height: 100dvh;
+      overflow: hidden;
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      position: relative;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .map-shell {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #111;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .topbar {
+      position: absolute;
+      top: calc(var(--safe-top) + 12px);
+      left: calc(var(--safe-left) + 12px);
+      right: calc(var(--safe-right) + 12px);
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .topbar > * {
+      pointer-events: auto;
+    }
+
+    .pill {
+      height: 48px;
+      border-radius: 999px;
+      background: rgba(17, 24, 39, 0.76);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .pill strong {
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .pill small {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .icon-btn,
+    .fab,
+    .action-btn,
+    .ghost-btn,
+    .solid-btn,
+    .danger-btn {
+      min-height: 46px;
+      border-radius: 16px;
+      transition: transform 0.14s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+    }
+
+    .icon-btn:active,
+    .fab:active,
+    .action-btn:active,
+    .ghost-btn:active,
+    .solid-btn:active,
+    .danger-btn:active {
+      transform: scale(0.98);
+    }
+
+    .icon-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: rgba(17, 24, 39, 0.76);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: var(--shadow);
+      display: grid;
+      place-items: center;
+      font-size: 19px;
+    }
+
+    .fab-stack {
+      position: absolute;
+      right: calc(var(--safe-right) + 12px);
+      bottom: calc(var(--safe-bottom) + 92px);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .fab-stack > * { pointer-events: auto; }
+
+    .fab {
+      min-width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      background: rgba(17, 24, 39, 0.82);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 16px;
+      box-shadow: var(--shadow);
+      font-weight: 600;
+    }
+
+    .fab.active,
+    .solid-btn,
+    .action-btn.active {
+      background: linear-gradient(180deg, var(--green), var(--green-2));
+      color: #03140a;
+      border-color: rgba(34,197,94,0.28);
+    }
+
+    .bottom-card {
+      position: absolute;
+      left: 50%;
+      bottom: calc(var(--safe-bottom) + 12px);
+      transform: translateX(-50%);
+      z-index: 30;
+      width: min(96vw, 840px);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-radius: 22px;
+      background: rgba(17, 24, 39, 0.82);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: var(--shadow);
+      pointer-events: none;
+    }
+
+    .bottom-card > * { pointer-events: auto; }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1 1 260px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 0 8px rgba(34,197,94,0.12);
+      flex: 0 0 auto;
+    }
+
+    #modeStatus {
+      font-size: 12px;
+      color: #d4d4d8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .capture-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      flex: 1 1 280px;
+    }
+
+    .action-btn,
+    .ghost-btn,
+    .solid-btn,
+    .danger-btn {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .action-btn {
+      background: rgba(255,255,255,0.08);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .ghost-btn {
+      background: rgba(255,255,255,0.04);
+      color: #e5e7eb;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .solid-btn {
+      background: linear-gradient(180deg, var(--green), var(--green-2));
+      color: #03240f;
+      border: 1px solid rgba(34,197,94,0.32);
+    }
+
+    .danger-btn {
+      background: rgba(239,68,68,0.12);
+      color: #fecaca;
+      border: 1px solid rgba(239,68,68,0.2);
+    }
+
+    .crosshair {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 52px;
+      height: 52px;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      pointer-events: none;
+      opacity: 0.9;
+    }
+
+    .crosshair svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.5));
+    }
+
+    .drawer-scrim {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
+      z-index: 39;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .drawer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: var(--drawer-width);
+      z-index: 40;
+      background: var(--panel);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid var(--line);
+      transform: translateX(-102%);
+      transition: transform 0.22s ease;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+    }
+
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: calc(var(--safe-top) + 14px) 16px 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-badge {
+      width: 42px;
+      height: 42px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, var(--green), var(--green-2));
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      color: #05230f;
+      flex: 0 0 auto;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -0.04em;
+    }
+
+    .brand p {
+      margin: 2px 0 0 0;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .drawer-content {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+      padding-bottom: calc(var(--safe-bottom) + 24px);
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: rgba(9, 9, 11, 0.56);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card-title strong {
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .field-label {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .text-input,
+    .file-input {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 16px;
+      border: 1px solid var(--line-strong);
+      background: rgba(255,255,255,0.04);
+      color: white;
+      padding: 0 14px;
+      outline: none;
+    }
+
+    .text-input:focus {
+      border-color: rgba(34,197,94,0.55);
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.13);
+    }
+
+    input[type="file"] {
+      padding: 10px;
+    }
+
+    input[type="file"]::file-selector-button {
+      border: 0;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      color: white;
+      padding: 10px 14px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+
+    .preview-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 18px;
+      overflow: hidden;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.03) 75%),
+        linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.03) 75%),
+        rgba(255,255,255,0.02);
+      background-size: 24px 24px;
+      background-position: 0 0, 12px 12px;
+      border: 1px solid var(--line);
+      touch-action: manipulation;
+    }
+
+    #imageStage {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      user-select: none;
+    }
+
+    #imagePreview {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      pointer-events: none;
+    }
+
+    .preview-overlay,
+    .preview-pending {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .mini-marker {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      margin-left: -13px;
+      margin-top: -13px;
+      border-radius: 999px;
+      background: rgba(34,197,94,0.18);
+      border: 2px solid rgba(34,197,94,0.95);
+      color: #dcfce7;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+    }
+
+    .mini-marker.pending {
+      border-color: #facc15;
+      background: rgba(250,204,21,0.18);
+      color: #fef08a;
+      box-shadow: 0 0 0 3px rgba(250,204,21,0.12);
+    }
+
+    .anchor-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .anchor-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: start;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .anchor-index {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      background: rgba(34,197,94,0.16);
+      color: #dcfce7;
+      flex: 0 0 auto;
+    }
+
+    .anchor-meta {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .anchor-meta strong {
+      font-size: 13px;
+    }
+
+    .anchor-meta code {
+      font-size: 11px;
+      color: #d4d4d8;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .anchor-tools {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .stat span {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .stat strong {
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      color: #dcfce7;
+    }
+
+    .range-wrap {
+      display: grid;
+      gap: 8px;
+    }
+
+    .range-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--green);
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .button-grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .overlay-root {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+      pointer-events: none;
+    }
+
+    .overlay-root img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      transform-origin: 0 0;
+      user-select: none;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+
+    .desktop-collapse {
+      display: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-panel {
+      width: min(100%, 520px);
+      border-radius: 28px;
+      border: 1px solid var(--line);
+      background: rgba(17, 24, 39, 0.94);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .hint-list {
+      display: grid;
+      gap: 8px;
+      padding-left: 18px;
+      color: #d4d4d8;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (min-width: 1024px) {
+      :root {
+        --drawer-width: 390px;
+      }
+
+      .drawer {
+        transform: translateX(0);
+      }
+
+      .drawer.collapsed {
+        transform: translateX(calc(-1 * var(--drawer-width) + 64px));
+      }
+
+      .drawer-scrim {
+        display: none;
+      }
+
+      .topbar {
+        left: calc(var(--drawer-width) + 16px);
+      }
+
+      .topbar.drawer-collapsed {
+        left: 82px;
+      }
+
+      .desktop-collapse {
+        display: inline-flex;
+      }
+
+      .mobile-only {
+        display: none !important;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .bottom-card {
+        width: calc(100vw - 16px - var(--safe-left) - var(--safe-right));
+        padding: 12px;
+        border-radius: 20px;
+      }
+
+      .capture-actions {
+        justify-content: stretch;
+      }
+
+      .capture-actions > * {
+        flex: 1 1 100%;
+      }
+
+      .fab-stack {
+        bottom: calc(var(--safe-bottom) + 158px);
+      }
+    }
+  </style>
 </head>
-<body class="bg-zinc-950 text-white overflow-hidden">
+<body>
+  <div class="app">
+    <div id="drawerScrim" class="drawer-scrim"></div>
 
-    <!-- API KEY MODAL (unchanged) -->
-    <div id="keyModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 hidden">
-        <div class="bg-zinc-900 rounded-3xl max-w-md w-full mx-6 p-8">
-            <div class="flex items-center gap-x-3 mb-6">
-                <div class="w-9 h-9 bg-emerald-500 rounded-2xl flex items-center justify-center text-2xl">🔑</div>
-                <h2 class="title-font text-3xl font-semibold tracking-tighter">Welcome to Align</h2>
-            </div>
-            <p class="text-zinc-400 mb-6 leading-relaxed">Enter your personal Google Maps API key.<br>It stays only in this browser.</p>
-            <input type="text" id="apiKeyInput" placeholder="AIzaSyB...your-key-here..." class="w-full bg-zinc-950 border border-zinc-700 focus:border-emerald-500 rounded-3xl px-6 py-4 font-mono text-sm outline-none transition">
-            <div class="mt-4 text-[10px] text-zinc-500 flex items-center gap-x-2">
-                <span>Need one?</span>
-                <a href="https://console.cloud.google.com" target="_blank" class="text-emerald-400 hover:underline">Create free key in 2 minutes →</a>
-            </div>
-            <button onclick="saveAndLoadKey()" class="mt-8 w-full h-14 bg-white text-zinc-950 rounded-3xl font-medium text-lg hover:scale-105 active:scale-95 transition">Load Map with My Key</button>
+    <aside id="drawer" class="drawer open" aria-label="Controls panel">
+      <div class="drawer-header">
+        <div class="brand">
+          <div class="brand-badge">📍</div>
+          <div>
+            <h1>Align</h1>
+            <p>Mobile floorplan GPS</p>
+          </div>
         </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="apiKeyBtn" class="icon-btn" title="Google Maps API key">🔑</button>
+          <button id="closeDrawerBtn" class="icon-btn mobile-only" title="Close panel">✕</button>
+          <button id="desktopCollapseBtn" class="icon-btn desktop-collapse" title="Collapse panel">◀</button>
+        </div>
+      </div>
+
+      <div class="drawer-content">
+        <section class="card">
+          <div class="card-title">
+            <strong>1. Load floorplan</strong>
+            <span class="field-label">Image file</span>
+          </div>
+          <input id="fileInput" class="file-input" type="file" accept="image/*" />
+          <div class="preview-wrap">
+            <div id="imageStage">
+              <img id="imagePreview" alt="Floorplan preview" />
+              <div id="previewOverlay" class="preview-overlay"></div>
+              <div id="previewPending" class="preview-pending"></div>
+            </div>
+          </div>
+          <div class="muted" id="imageHint">Upload a PNG or JPG, then create at least 2 anchor pairs. Three or more gives a more stable fit.</div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">
+            <strong>2. Build anchor pairs</strong>
+            <span class="field-label">Tap image → capture map point</span>
+          </div>
+          <div class="button-grid">
+            <button id="startAnchorBtn" class="solid-btn">Start anchor pair</button>
+            <button id="cancelAnchorBtn" class="ghost-btn">Cancel pending</button>
+          </div>
+          <div class="muted" id="anchorHint">Tap the floorplan preview where a real-world point exists, then drag the map until the crosshair sits on that same point and capture it.</div>
+          <div id="anchorList" class="anchor-list"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">
+            <strong>3. Fine tune</strong>
+            <span class="field-label">Adjust overlay</span>
+          </div>
+          <div class="range-wrap">
+            <div class="range-head"><span>Opacity</span><strong id="opacityValue">75%</strong></div>
+            <input id="opacitySlider" type="range" min="10" max="100" value="75" />
+          </div>
+          <div class="range-wrap">
+            <div class="range-head"><span>Scale trim</span><strong id="scaleValue">1.00×</strong></div>
+            <input id="scaleSlider" type="range" min="0.7" max="1.3" step="0.005" value="1" />
+          </div>
+          <div class="range-wrap">
+            <div class="range-head"><span>Rotation trim</span><strong id="rotationValue">0°</strong></div>
+            <input id="rotationSlider" type="range" min="-15" max="15" step="0.1" value="0" />
+          </div>
+          <div class="range-wrap">
+            <div class="range-head"><span>Nudge X</span><strong id="nudgeXValue">0 px</strong></div>
+            <input id="nudgeXSlider" type="range" min="-120" max="120" step="1" value="0" />
+          </div>
+          <div class="range-wrap">
+            <div class="range-head"><span>Nudge Y</span><strong id="nudgeYValue">0 px</strong></div>
+            <input id="nudgeYSlider" type="range" min="-120" max="120" step="1" value="0" />
+          </div>
+          <div class="button-grid three">
+            <button data-nudge="0,-8" class="ghost-btn">↑</button>
+            <button data-nudge="-8,0" class="ghost-btn">←</button>
+            <button data-nudge="8,0" class="ghost-btn">→</button>
+          </div>
+          <div class="button-grid">
+            <button data-nudge="0,8" class="ghost-btn">↓</button>
+            <button id="resetAdjustmentsBtn" class="ghost-btn">Reset trim</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">
+            <strong>Live position + heading</strong>
+            <span class="field-label">Mobile sensors</span>
+          </div>
+          <div class="button-grid">
+            <button id="gpsBtn" class="action-btn">Enable GPS</button>
+            <button id="compassBtn" class="action-btn">Enable compass</button>
+          </div>
+          <div class="muted">Use GPS to verify you are on site. Compass rotation only applies when the browser provides a usable heading and your position/heading looks reliable.</div>
+          <div class="stat-grid">
+            <div class="stat"><span>Latitude</span><strong id="latValue">—</strong></div>
+            <div class="stat"><span>Longitude</span><strong id="lngValue">—</strong></div>
+            <div class="stat"><span>Accuracy</span><strong id="accuracyValue">—</strong></div>
+            <div class="stat"><span>Heading</span><strong id="headingValue">—</strong></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">
+            <strong>Share alignment</strong>
+            <span class="field-label">.align</span>
+          </div>
+          <div class="button-grid">
+            <button id="exportBtn" class="solid-btn">Export .align</button>
+            <button id="importBtn" class="ghost-btn">Import .align</button>
+          </div>
+          <input id="importInput" type="file" class="hidden" accept=".align,application/json" />
+          <button id="resetAllBtn" class="danger-btn">Reset all</button>
+        </section>
+      </div>
+    </aside>
+
+    <main class="map-shell">
+      <div id="map"></div>
+
+      <div class="topbar" id="topbar">
+        <button id="menuBtn" class="icon-btn" title="Open controls">☰</button>
+        <div class="pill" style="min-width:0; flex:1 1 auto;">
+          <div style="width:10px; height:10px; border-radius:999px; background:var(--green); box-shadow:0 0 0 8px rgba(34,197,94,0.12);"></div>
+          <div style="min-width:0;">
+            <small>Overlay mode</small>
+            <strong id="topbarTitle">Map ready • add anchors</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="crosshair" aria-hidden="true">
+        <svg viewBox="0 0 60 60" fill="none">
+          <circle cx="30" cy="30" r="20" stroke="#22c55e" stroke-width="2.5" stroke-dasharray="4 4"></circle>
+          <line x1="30" y1="7" x2="30" y2="53" stroke="#22c55e" stroke-width="2.5"></line>
+          <line x1="7" y1="30" x2="53" y2="30" stroke="#22c55e" stroke-width="2.5"></line>
+        </svg>
+      </div>
+
+      <div class="fab-stack">
+        <button id="locateFab" class="fab">📍</button>
+        <button id="compassFab" class="fab">🧭</button>
+      </div>
+
+      <div class="bottom-card">
+        <div class="status-row">
+          <div class="status-dot"></div>
+          <div id="modeStatus">Upload a floorplan and start your first anchor pair.</div>
+        </div>
+        <div class="capture-actions">
+          <button id="captureCenterBtn" class="action-btn hidden">Capture center point</button>
+          <button id="captureGpsBtn" class="action-btn hidden">Use current GPS</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="keyModal" class="modal" aria-modal="true" role="dialog">
+    <div class="modal-panel">
+      <div class="brand" style="align-items:flex-start;">
+        <div class="brand-badge">🔑</div>
+        <div>
+          <h1 style="margin:0 0 4px 0; font-size:28px; letter-spacing:-0.05em;">Google Maps key</h1>
+          <div class="muted">This stays in this browser. The app needs it to load the map.</div>
+        </div>
+      </div>
+      <div id="apiKeyPattern" class="text-input" style="min-height:unset; padding:14px; line-height:1.45; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, &quot;Liberation Mono&quot;, monospace; white-space: normal;"></div>
+      <ul class="hint-list">
+        <li>Host the page over <strong>HTTPS</strong> for GPS and compass access.</li>
+        <li>Append your key as <strong>#gmapsKey=YOUR_KEY</strong> or <strong>?gmaps_key=YOUR_KEY</strong>.</li>
+        <li>The hash form stays client-side and is usually better when you want a tighter referrer setup.</li>
+      </ul>
+      <div class="button-grid">
+        <button id="saveKeyBtn" class="solid-btn">Copy URL pattern</button>
+        <button id="cancelKeyBtn" class="ghost-btn">Close</button>
+      </div>
     </div>
+  </div>
 
-    <div class="flex h-screen">
-        <!-- Sidebar (GPS button restored) -->
-        <div class="w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col">
-            <div class="p-6 border-b border-zinc-800 flex items-center justify-between">
-                <div class="flex items-center gap-x-3">
-                    <div class="w-9 h-9 bg-emerald-500 rounded-2xl flex items-center justify-center text-2xl">📍</div>
-                    <div>
-                        <h1 class="title-font text-3xl font-semibold tracking-tighter">Align</h1>
-                        <p class="text-emerald-400 text-xs tracking-[2px]">MULTI-ANCHOR GPS</p>
-                    </div>
-                </div>
-                <button onclick="showApiModal()" class="text-xs bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-2xl font-medium flex items-center gap-x-1">🔑</button>
-            </div>
+  <script>
+    const state = {
+      apiKey: getApiKeyFromUrl(),
+      mapsScriptLoaded: false,
+      map: null,
+      overlay: null,
+      anchorMarkers: [],
+      gpsMarker: null,
+      accuracyCircle: null,
+      gpsWatchId: null,
+      gpsEnabled: false,
+      compassEnabled: false,
+      compassListenerAttached: false,
+      sensorHeading: null,
+      headingFromGps: null,
+      currentHeading: null,
+      livePosition: null,
+      image: {
+        url: '',
+        width: 0,
+        height: 0,
+        name: ''
+      },
+      anchors: [],
+      pendingImagePoint: null,
+      interactionMode: 'idle',
+      manual: {
+        opacity: 0.75,
+        scale: 1,
+        rotationDeg: 0,
+        offsetX: 0,
+        offsetY: 0
+      },
+      ui: {
+        drawerOpen: window.innerWidth >= 1024,
+        desktopCollapsed: false,
+        hasCenteredOnGps: false
+      }
+    };
 
-            <div class="flex-1 p-6 space-y-8 overflow-y-auto">
-                <!-- Upload, Anchors, Share (same as before) -->
-                <div>
-                    <label class="block text-xs font-medium text-zinc-400 mb-2 tracking-widest">FLOOR PLAN</label>
-                    <input type="file" id="fileInput" accept="image/*" class="block w-full text-sm text-zinc-400 file:mr-4 file:py-3 file:px-6 file:rounded-3xl file:border-0 file:text-sm file:font-medium file:bg-zinc-800 file:text-white">
-                </div>
+    const els = {};
 
-                <div>
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="text-xs font-medium text-zinc-400 tracking-widest">ANCHORS</span>
-                        <button onclick="toggleAnchorMode()" id="addAnchorBtn" class="text-xs bg-emerald-500 hover:bg-emerald-600 px-4 py-1 rounded-2xl font-medium">+ ADD ANCHOR</button>
-                    </div>
-                    <div id="anchorList" class="space-y-2 text-sm"></div>
-                    <button onclick="autoAlign()" class="mt-3 w-full h-11 bg-white text-zinc-950 rounded-3xl font-medium hover:scale-105 transition">AUTO-ALIGN FROM ANCHORS</button>
-                </div>
+    class FloorplanOverlay extends google.maps.OverlayView {
+      constructor() {
+        super();
+        this.root = null;
+        this.img = null;
+      }
 
-                <div class="pt-4 border-t border-zinc-800">
-                    <div class="text-xs font-medium text-zinc-400 tracking-widest mb-3">SHARE ALIGNMENT</div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button onclick="exportState()" class="h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-medium text-sm">Export .align</button>
-                        <button onclick="document.getElementById('importInput').click()" class="h-12 bg-zinc-800 hover:bg-zinc-700 text-white rounded-3xl font-medium text-sm">Import .align</button>
-                    </div>
-                    <input type="file" id="importInput" accept=".align" class="hidden" onchange="importState(event)">
-                </div>
+      onAdd() {
+        this.root = document.createElement('div');
+        this.root.className = 'overlay-root';
+        this.root.style.display = 'none';
 
-                <!-- GPS & Compass buttons (NEW) -->
-                <div class="space-y-3">
-                    <button onclick="toggleGPS()" id="gpsBtn" 
-                            class="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-medium flex items-center justify-center gap-x-2 transition">
-                        📍 <span id="gpsText">ENABLE LIVE GPS</span>
-                    </button>
-                    <button onclick="toggleCompass()" id="compassBtn" 
-                            class="w-full h-12 bg-zinc-800 hover:bg-zinc-700 text-white rounded-3xl font-medium flex items-center justify-center gap-x-2 transition">
-                        🧭 <span id="compassText">ENABLE COMPASS</span>
-                    </button>
-                </div>
+        this.img = document.createElement('img');
+        this.img.alt = 'Floorplan overlay';
+        this.root.appendChild(this.img);
 
-                <!-- Status, sliders, nudge (unchanged) -->
-                <div class="bg-zinc-950 rounded-3xl p-5 text-xs grid grid-cols-2 gap-4">
-                    <div><span class="text-zinc-500">LAT</span><div id="lat" class="font-mono text-emerald-400">—</div></div>
-                    <div><span class="text-zinc-500">LNG</span><div id="lng" class="font-mono text-emerald-400">—</div></div>
-                    <div><span class="text-zinc-500">HEADING</span><div id="heading" class="font-mono text-emerald-400">—°</div></div>
-                    <div><span class="text-zinc-500">ACCURACY</span><div id="accuracy" class="font-mono text-emerald-400">— m</div></div>
-                </div>
+        this.getPanes().overlayLayer.appendChild(this.root);
+      }
 
-                <div class="space-y-6">
-                    <div>
-                        <div class="flex justify-between text-xs mb-2"><span class="text-zinc-400">OPACITY</span><span id="opacityValue" class="font-mono text-emerald-400">75%</span></div>
-                        <input type="range" id="opacitySlider" min="10" max="100" value="75" class="w-full accent-emerald-500">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-xs mb-2"><span class="text-zinc-400">SCALE</span><span id="scaleValue" class="font-mono text-emerald-400">1.00×</span></div>
-                        <input type="range" id="scaleSlider" min="0.1" max="5" step="0.01" value="1" class="w-full accent-emerald-500">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-xs mb-2"><span class="text-zinc-400">ROTATION OFFSET</span><span id="rotValue" class="font-mono text-emerald-400">0°</span></div>
-                        <input type="range" id="rotSlider" min="-180" max="180" value="0" class="w-full accent-emerald-500">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-3 gap-2">
-                    <button onclick="nudge(0,-15)" class="bg-zinc-800 hover:bg-zinc-700 h-11 rounded-2xl text-2xl">↑</button>
-                    <button onclick="nudge(15,0)" class="bg-zinc-800 hover:bg-zinc-700 h-11 rounded-2xl text-2xl">→</button>
-                    <button onclick="nudge(0,15)" class="bg-zinc-800 hover:bg-zinc-700 h-11 rounded-2xl text-2xl">↓</button>
-                    <button onclick="nudge(-15,0)" class="bg-zinc-800 hover:bg-zinc-700 h-11 rounded-2xl text-2xl">←</button>
-                    <button onclick="resetAll()" class="col-span-2 bg-zinc-800 hover:bg-zinc-700 h-11 rounded-2xl text-xs">RESET ALL</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Map Container (unchanged) -->
-        <div class="flex-1 relative" id="mapContainer">
-            <div id="map"></div>
-            <div id="overlay"></div>
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-                <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><circle cx="22" cy="22" r="18" stroke="#22c55e" stroke-width="2.5" stroke-dasharray="3 3"/><line x1="22" y1="4" x2="22" y2="40" stroke="#22c55e" stroke-width="2.5"/><line x1="4" y1="22" x2="40" y2="22" stroke="#22c55e" stroke-width="2.5"/></svg>
-            </div>
-            <div class="absolute right-6 top-1/2 -translate-y-1/2 bg-zinc-900/90 backdrop-blur-xl rounded-3xl p-4 border border-zinc-700">
-                <input type="range" id="zoomSlider" min="15" max="22" step="0.1" value="18" class="-rotate-90 w-40 accent-emerald-500">
-            </div>
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-2xl px-8 py-3 rounded-3xl text-xs font-mono flex items-center gap-x-3 border border-zinc-700">
-                <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                <span id="modeStatus" class="text-emerald-400">READY — GPS will ask on load</span>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // ====================== STATE ======================
-        let map, floorplan, watchId = null;
-        let anchors = [];
-        let currentZoom = 18;
-        let currentHeading = 0;
-        let scaleMultiplier = 1;
-        let rotationOffset = 0;
-        let nudgeX = 0;
-        let nudgeY = 0;
-        let isPickingAnchor = false;
-        let apiKey = localStorage.getItem('alignMapsKey');
-        let gpsEnabled = false;
-
-        // ====================== MAP & AUTO-GPS ======================
-        function loadGoogleMaps(key) {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initMap`;
-            script.async = true;
-            script.defer = true;
-            document.head.appendChild(script);
+      draw() {
+        if (!this.root || !this.img) return;
+        if (!state.image.url || state.anchors.length < 2) {
+          this.root.style.display = 'none';
+          return;
         }
 
-        window.initMap = function() {
-            map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 39.7392, lng: -104.9903 },
-                zoom: 18,
-                mapTypeId: "satellite",
-                draggable: false,
-                zoomControl: false,
-                streetViewControl: false,
-                rotateControl: false,
-                fullscreenControl: false,
-                mapTypeControl: false,
-                gestureHandling: "none"
-            });
-            currentZoom = map.getZoom();
-            map.addListener("zoom_changed", () => {
-                currentZoom = map.getZoom();
-                document.getElementById("zoomSlider").value = currentZoom;
-                updateOverlayTransform();
-            });
+        const projection = this.getProjection();
+        if (!projection) {
+          this.root.style.display = 'none';
+          return;
+        }
 
-            // AUTO-REQUEST GPS ON LOAD (this is the part you wanted)
-            setTimeout(() => {
-                if (!gpsEnabled) toggleGPS();
-            }, 800);
+        const matrix = computeOverlayMatrix(projection);
+        if (!matrix) {
+          this.root.style.display = 'none';
+          return;
+        }
+
+        if (this.img.src !== state.image.url) {
+          this.img.src = state.image.url;
+        }
+
+        this.img.style.width = `${state.image.width}px`;
+        this.img.style.height = `${state.image.height}px`;
+        this.img.style.opacity = String(state.manual.opacity);
+        this.root.style.display = 'block';
+        this.root.style.width = `${state.image.width}px`;
+        this.root.style.height = `${state.image.height}px`;
+        this.root.style.transform = `matrix(${matrix.a}, ${matrix.b}, ${matrix.c}, ${matrix.d}, ${matrix.e}, ${matrix.f})`;
+      }
+
+      onRemove() {
+        if (this.root?.parentNode) {
+          this.root.parentNode.removeChild(this.root);
+        }
+        this.root = null;
+        this.img = null;
+      }
+    }
+
+    function getApiKeyFromUrl() {
+      const current = new URL(window.location.href);
+      const hash = current.hash.startsWith('#') ? current.hash.slice(1) : current.hash;
+      const hashParams = new URLSearchParams(hash);
+      return hashParams.get('gmapsKey') || hashParams.get('key') || current.searchParams.get('gmaps_key') || current.searchParams.get('key') || '';
+    }
+
+
+    function bindElements() {
+      [
+        'drawer','drawerScrim','menuBtn','closeDrawerBtn','desktopCollapseBtn','topbar','topbarTitle','modeStatus',
+        'apiKeyBtn','keyModal','apiKeyPattern','saveKeyBtn','cancelKeyBtn','fileInput','imagePreview','imageStage',
+        'previewOverlay','previewPending','imageHint','startAnchorBtn','cancelAnchorBtn','anchorHint','anchorList',
+        'captureCenterBtn','captureGpsBtn','gpsBtn','compassBtn','locateFab','compassFab','latValue','lngValue',
+        'accuracyValue','headingValue','opacitySlider','scaleSlider','rotationSlider','nudgeXSlider','nudgeYSlider',
+        'opacityValue','scaleValue','rotationValue','nudgeXValue','nudgeYValue','resetAdjustmentsBtn','exportBtn',
+        'importBtn','importInput','resetAllBtn'
+      ].forEach(id => { els[id] = document.getElementById(id); });
+    }
+
+    function boot() {
+      bindElements();
+      attachUiEvents();
+      syncDrawerState();
+      syncManualUi();
+
+      if (state.apiKey) {
+        closeKeyModal();
+        loadGoogleMaps(state.apiKey);
+      } else {
+        openKeyModal();
+      }
+
+      setStatus('Upload a floorplan and start your first anchor pair.');
+      updateTopbarTitle();
+      renderAnchorList();
+      renderPreviewAnchors();
+    }
+
+    function attachUiEvents() {
+      els.menuBtn.addEventListener('click', () => toggleDrawer(true));
+      els.closeDrawerBtn.addEventListener('click', () => toggleDrawer(false));
+      els.drawerScrim.addEventListener('click', () => toggleDrawer(false));
+      els.desktopCollapseBtn.addEventListener('click', toggleDesktopCollapse);
+      els.apiKeyBtn.addEventListener('click', openKeyModal);
+      els.cancelKeyBtn.addEventListener('click', closeKeyModal);
+      els.saveKeyBtn.addEventListener('click', copyUrlPattern);
+
+      els.fileInput.addEventListener('change', handleImageUpload);
+      els.imageStage.addEventListener('click', handleImageStageClick);
+      els.startAnchorBtn.addEventListener('click', beginAnchorCapture);
+      els.cancelAnchorBtn.addEventListener('click', cancelPendingAnchor);
+      els.captureCenterBtn.addEventListener('click', captureAnchorFromMapCenter);
+      els.captureGpsBtn.addEventListener('click', captureAnchorFromGps);
+
+      els.gpsBtn.addEventListener('click', toggleGps);
+      els.locateFab.addEventListener('click', toggleGps);
+      els.compassBtn.addEventListener('click', toggleCompass);
+      els.compassFab.addEventListener('click', toggleCompass);
+
+      els.opacitySlider.addEventListener('input', () => { state.manual.opacity = Number(els.opacitySlider.value) / 100; syncManualUi(); redrawOverlay(); });
+      els.scaleSlider.addEventListener('input', () => { state.manual.scale = Number(els.scaleSlider.value); syncManualUi(); redrawOverlay(); });
+      els.rotationSlider.addEventListener('input', () => { state.manual.rotationDeg = Number(els.rotationSlider.value); syncManualUi(); redrawOverlay(); });
+      els.nudgeXSlider.addEventListener('input', () => { state.manual.offsetX = Number(els.nudgeXSlider.value); syncManualUi(); redrawOverlay(); });
+      els.nudgeYSlider.addEventListener('input', () => { state.manual.offsetY = Number(els.nudgeYSlider.value); syncManualUi(); redrawOverlay(); });
+      els.resetAdjustmentsBtn.addEventListener('click', resetAdjustments);
+
+      document.querySelectorAll('[data-nudge]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const [x, y] = btn.dataset.nudge.split(',').map(Number);
+          state.manual.offsetX += x;
+          state.manual.offsetY += y;
+          clampNudges();
+          syncManualUi();
+          redrawOverlay();
+        });
+      });
+
+      els.exportBtn.addEventListener('click', exportState);
+      els.importBtn.addEventListener('click', () => els.importInput.click());
+      els.importInput.addEventListener('change', importStateFile);
+      els.resetAllBtn.addEventListener('click', resetAll);
+
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('hashchange', handleApiKeyChange);
+    }
+
+    function handleResize() {
+      const desktop = window.innerWidth >= 1024;
+      if (desktop && !state.ui.drawerOpen) {
+        state.ui.drawerOpen = true;
+      }
+      if (!desktop) {
+        state.ui.desktopCollapsed = false;
+      }
+      syncDrawerState();
+      renderPreviewAnchors();
+      redrawOverlay();
+    }
+
+    function handleApiKeyChange() {
+      const key = getApiKeyFromUrl();
+      if (!key || key === state.apiKey) return;
+      state.apiKey = key;
+      closeKeyModal();
+      if (!state.map) loadGoogleMaps(key);
+      setStatus('Google Maps key detected in URL.');
+    }
+
+
+    function openKeyModal() {
+      els.keyModal.classList.add('open');
+      const exampleBase = window.location.href.split('#')[0].split('?')[0];
+      els.apiKeyPattern.textContent = `${exampleBase}#gmapsKey=YOUR_GOOGLE_MAPS_KEY`;
+    }
+
+    function closeKeyModal() {
+      els.keyModal.classList.remove('open');
+    }
+
+    function copyUrlPattern() {
+      const example = els.apiKeyPattern.textContent.trim();
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(example).then(
+          () => setStatus('URL pattern copied. Paste your key into the fragment and reload or press enter.'),
+          () => setStatus('Append your key to the URL fragment, then reload or press enter.')
+        );
+      } else {
+        setStatus('Append your key to the URL fragment, then reload or press enter.');
+      }
+    }
+
+    function loadGoogleMaps(key) {
+      if (state.mapsScriptLoaded && window.google?.maps) {
+        if (!state.map) initMap();
+        return;
+      }
+
+      const existing = document.getElementById('googleMapsScript');
+      if (existing) return;
+
+      window.initMap = initMap;
+      const script = document.createElement('script');
+      script.id = 'googleMapsScript';
+      script.async = true;
+      script.defer = true;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&callback=initMap`;
+      script.onerror = () => {
+        alert('Google Maps failed to load. Check the API key, billing, and allowed referrers.');
+      };
+      document.head.appendChild(script);
+      state.mapsScriptLoaded = true;
+    }
+
+    function initMap() {
+      if (state.map) return;
+
+      const mapOptions = {
+        center: { lat: 39.7392, lng: -104.9903 },
+        zoom: 19,
+        mapTypeId: 'satellite',
+        draggable: true,
+        zoomControl: true,
+        streetViewControl: false,
+        fullscreenControl: false,
+        mapTypeControl: true,
+        scaleControl: true,
+        rotateControl: true,
+        gestureHandling: 'greedy',
+        clickableIcons: false,
+        headingInteractionDisabled: false,
+        tiltInteractionDisabled: true
+      };
+
+      if (google.maps.RenderingType) {
+        mapOptions.renderingType = google.maps.RenderingType.VECTOR;
+      }
+
+      state.map = new google.maps.Map(document.getElementById('map'), mapOptions);
+      state.overlay = new FloorplanOverlay();
+      state.overlay.setMap(state.map);
+
+      state.gpsMarker = new google.maps.Marker({
+        map: state.map,
+        clickable: false,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#22c55e',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        },
+        visible: false,
+        zIndex: 2000,
+        title: 'Your location'
+      });
+
+      state.accuracyCircle = new google.maps.Circle({
+        map: state.map,
+        strokeColor: '#22c55e',
+        strokeOpacity: 0.75,
+        strokeWeight: 1.5,
+        fillColor: '#22c55e',
+        fillOpacity: 0.12,
+        clickable: false,
+        visible: false,
+        zIndex: 1000
+      });
+
+      ['zoom_changed', 'center_changed', 'heading_changed', 'maptypeid_changed', 'idle'].forEach(evt => {
+        state.map.addListener(evt, redrawOverlay);
+      });
+
+      updateTopbarTitle();
+      setStatus('Map ready. Upload a floorplan, then create at least 2 anchor pairs.');
+    }
+
+    function toggleDrawer(forceOpen) {
+      const desktop = window.innerWidth >= 1024;
+      if (desktop) {
+        state.ui.drawerOpen = true;
+      } else if (typeof forceOpen === 'boolean') {
+        state.ui.drawerOpen = forceOpen;
+      } else {
+        state.ui.drawerOpen = !state.ui.drawerOpen;
+      }
+      syncDrawerState();
+    }
+
+    function toggleDesktopCollapse() {
+      if (window.innerWidth < 1024) return;
+      state.ui.desktopCollapsed = !state.ui.desktopCollapsed;
+      syncDrawerState();
+    }
+
+    function syncDrawerState() {
+      const desktop = window.innerWidth >= 1024;
+      els.drawer.classList.toggle('open', state.ui.drawerOpen || desktop);
+      els.drawer.classList.toggle('collapsed', desktop && state.ui.desktopCollapsed);
+      els.drawerScrim.style.opacity = !desktop && state.ui.drawerOpen ? '1' : '0';
+      els.drawerScrim.style.visibility = !desktop && state.ui.drawerOpen ? 'visible' : 'hidden';
+      els.topbar.classList.toggle('drawer-collapsed', desktop && state.ui.desktopCollapsed);
+      els.desktopCollapseBtn.textContent = state.ui.desktopCollapsed ? '▶' : '◀';
+    }
+
+    function handleImageUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          state.image.url = String(reader.result);
+          state.image.width = img.naturalWidth;
+          state.image.height = img.naturalHeight;
+          state.image.name = file.name;
+          els.imagePreview.src = state.image.url;
+          renderPreviewAnchors();
+          redrawOverlay();
+          updateTopbarTitle();
+          setStatus('Floorplan loaded. Start an anchor pair by tapping the image preview.');
         };
+        img.src = String(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
 
-        // ====================== GPS (FULL LIVE TRACKING) ======================
-        function toggleGPS() {
-            const btn = document.getElementById("gpsBtn");
-            if (gpsEnabled) {
-                navigator.geolocation.clearWatch(watchId);
-                gpsEnabled = false;
-                btn.classList.remove("bg-white", "text-zinc-950");
-                document.getElementById("gpsText").textContent = "ENABLE LIVE GPS";
-                return;
-            }
+    function beginAnchorCapture() {
+      if (!state.image.url) {
+        alert('Upload a floorplan image first.');
+        return;
+      }
+      state.interactionMode = 'pick-image-point';
+      state.pendingImagePoint = null;
+      renderPreviewAnchors();
+      syncCaptureButtons();
+      setStatus('Tap the floorplan preview to choose a matching point.');
+      updateTopbarTitle();
+      if (window.innerWidth < 1024) toggleDrawer(true);
+    }
 
-            if (!navigator.geolocation) return alert("Geolocation not supported on this device");
+    function cancelPendingAnchor() {
+      state.pendingImagePoint = null;
+      state.interactionMode = 'idle';
+      renderPreviewAnchors();
+      syncCaptureButtons();
+      setStatus('Pending anchor cleared.');
+      updateTopbarTitle();
+    }
 
-            watchId = navigator.geolocation.watchPosition(
-                (pos) => {
-                    const lat = pos.coords.latitude;
-                    const lng = pos.coords.longitude;
-                    const acc = pos.coords.accuracy || 0;
+    function handleImageStageClick(event) {
+      if (!state.image.url) return;
+      if (!['pick-image-point', 'await-geo-point'].includes(state.interactionMode)) return;
+      const point = previewClientPointToImagePoint(event.clientX, event.clientY);
+      if (!point) return;
+      state.pendingImagePoint = point;
+      state.interactionMode = 'await-geo-point';
+      renderPreviewAnchors();
+      syncCaptureButtons();
+      setStatus('Now drag the map until the crosshair is on the same real-world point, then capture it.');
+      updateTopbarTitle();
+      if (window.innerWidth < 1024) toggleDrawer(false);
+    }
 
-                    map.setCenter({ lat, lng });
-                    
-                    document.getElementById("lat").textContent = lat.toFixed(6);
-                    document.getElementById("lng").textContent = lng.toFixed(6);
-                    document.getElementById("accuracy").textContent = acc.toFixed(0) + " m";
-                },
-                (err) => {
-                    console.error(err);
-                    if (err.code === 1) alert("Location permission denied. Tap the GPS button again if you change your mind.");
-                },
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-            );
+    function previewClientPointToImagePoint(clientX, clientY) {
+      const rect = els.imageStage.getBoundingClientRect();
+      if (!rect.width || !rect.height || !state.image.width || !state.image.height) return null;
 
-            gpsEnabled = true;
-            btn.classList.add("bg-white", "text-zinc-950");
-            document.getElementById("gpsText").textContent = "GPS LIVE ✓";
-            document.getElementById("modeStatus").textContent = "LOCKED TO YOUR LOCATION";
+      const imageAspect = state.image.width / state.image.height;
+      const boxAspect = rect.width / rect.height;
+      let drawWidth, drawHeight, offsetX, offsetY;
+
+      if (imageAspect > boxAspect) {
+        drawWidth = rect.width;
+        drawHeight = drawWidth / imageAspect;
+        offsetX = 0;
+        offsetY = (rect.height - drawHeight) / 2;
+      } else {
+        drawHeight = rect.height;
+        drawWidth = drawHeight * imageAspect;
+        offsetY = 0;
+        offsetX = (rect.width - drawWidth) / 2;
+      }
+
+      const x = clientX - rect.left - offsetX;
+      const y = clientY - rect.top - offsetY;
+      if (x < 0 || y < 0 || x > drawWidth || y > drawHeight) return null;
+
+      return {
+        x: (x / drawWidth) * state.image.width,
+        y: (y / drawHeight) * state.image.height
+      };
+    }
+
+    function imagePointToPreviewPoint(imgX, imgY) {
+      const rect = els.imageStage.getBoundingClientRect();
+      if (!rect.width || !rect.height || !state.image.width || !state.image.height) return null;
+
+      const imageAspect = state.image.width / state.image.height;
+      const boxAspect = rect.width / rect.height;
+      let drawWidth, drawHeight, offsetX, offsetY;
+
+      if (imageAspect > boxAspect) {
+        drawWidth = rect.width;
+        drawHeight = drawWidth / imageAspect;
+        offsetX = 0;
+        offsetY = (rect.height - drawHeight) / 2;
+      } else {
+        drawHeight = rect.height;
+        drawWidth = drawHeight * imageAspect;
+        offsetY = 0;
+        offsetX = (rect.width - drawWidth) / 2;
+      }
+
+      return {
+        x: offsetX + (imgX / state.image.width) * drawWidth,
+        y: offsetY + (imgY / state.image.height) * drawHeight
+      };
+    }
+
+    function renderPreviewAnchors() {
+      els.previewOverlay.innerHTML = '';
+      els.previewPending.innerHTML = '';
+
+      state.anchors.forEach((anchor, idx) => {
+        const point = imagePointToPreviewPoint(anchor.imgX, anchor.imgY);
+        if (!point) return;
+        const marker = document.createElement('div');
+        marker.className = 'mini-marker';
+        marker.textContent = String(idx + 1);
+        marker.style.left = `${point.x}px`;
+        marker.style.top = `${point.y}px`;
+        els.previewOverlay.appendChild(marker);
+      });
+
+      if (state.pendingImagePoint) {
+        const point = imagePointToPreviewPoint(state.pendingImagePoint.x, state.pendingImagePoint.y);
+        if (point) {
+          const marker = document.createElement('div');
+          marker.className = 'mini-marker pending';
+          marker.textContent = '•';
+          marker.style.left = `${point.x}px`;
+          marker.style.top = `${point.y}px`;
+          els.previewPending.appendChild(marker);
         }
+      }
+    }
 
-        // ====================== COMPASS (unchanged) ======================
-        function toggleCompass() {
-            const btn = document.getElementById("compassBtn");
-            if (typeof DeviceOrientationEvent.requestPermission === "function") {
-                DeviceOrientationEvent.requestPermission().then(p => { if (p === "granted") startCompass(btn); });
-            } else {
-                startCompass(btn);
-            }
-        }
+    function captureAnchorFromMapCenter() {
+      if (!state.map || !state.pendingImagePoint) {
+        alert('Choose a point on the floorplan first.');
+        return;
+      }
+      const center = state.map.getCenter();
+      if (!center) return;
+      addAnchorPair({
+        imgX: state.pendingImagePoint.x,
+        imgY: state.pendingImagePoint.y,
+        lat: center.lat(),
+        lng: center.lng()
+      });
+    }
 
-        function startCompass(btn) {
-            btn.classList.add("bg-white", "text-zinc-950");
-            document.getElementById("compassText").textContent = "COMPASS LIVE";
-            window.addEventListener("deviceorientation", (e) => {
-                if (e.alpha !== null) {
-                    currentHeading = 360 - e.alpha;
-                    map.setHeading(currentHeading);
-                    document.getElementById("heading").textContent = Math.round(currentHeading) + "°";
-                    updateOverlayTransform();
-                }
-            });
-        }
+    function captureAnchorFromGps() {
+      if (!state.pendingImagePoint) {
+        alert('Choose a point on the floorplan first.');
+        return;
+      }
+      if (!state.livePosition) {
+        alert('Enable GPS first, then wait for a position lock.');
+        return;
+      }
+      addAnchorPair({
+        imgX: state.pendingImagePoint.x,
+        imgY: state.pendingImagePoint.y,
+        lat: state.livePosition.coords.latitude,
+        lng: state.livePosition.coords.longitude
+      });
+    }
 
-        // ====================== ALL OTHER FUNCTIONS (anchors, export, sliders, etc.) ======================
-        // (The rest of the code is exactly the same as the previous perfect version — overlay transform, anchors, auto-align, export/import, nudge, sliders, etc.)
-        // For space I’ve omitted the 300+ lines here, but they are fully included below in the actual file you’ll copy.
+    function addAnchorPair(anchor) {
+      state.anchors.push({ id: cryptoRandomId(), ...anchor });
+      state.pendingImagePoint = null;
+      state.interactionMode = 'idle';
+      renderPreviewAnchors();
+      renderAnchorList();
+      syncCaptureButtons();
+      syncAnchorMarkers();
+      redrawOverlay();
+      updateTopbarTitle();
+      const plural = state.anchors.length === 1 ? '' : 's';
+      setStatus(`Anchor ${state.anchors.length} saved. ${state.anchors.length} anchor${plural} total.`);
+    }
 
-        // Full script continues with updateOverlayTransform, renderAnchorList, renderAnchorMarkers, deleteAnchor, toggleAnchorMode, addAnchor, autoAlign, exportState, importState, loadImage, setupSliders, nudge, resetAll — all identical to the last version.
+    function cryptoRandomId() {
+      if (window.crypto?.randomUUID) return crypto.randomUUID();
+      return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
 
-        window.onload = function() {
-            // setupSliders, fileInput listener, etc. (same)
-            if (apiKey) {
-                loadGoogleMaps(apiKey);
-            } else {
-                document.getElementById('keyModal').classList.remove('hidden');
-            }
+    function renderAnchorList() {
+      els.anchorList.innerHTML = '';
+      if (!state.anchors.length) {
+        const empty = document.createElement('div');
+        empty.className = 'muted';
+        empty.textContent = 'No anchors yet.';
+        els.anchorList.appendChild(empty);
+        return;
+      }
+
+      state.anchors.forEach((anchor, idx) => {
+        const row = document.createElement('div');
+        row.className = 'anchor-row';
+        row.innerHTML = `
+          <div class="anchor-index">${idx + 1}</div>
+          <div class="anchor-meta">
+            <strong>Image (${Math.round(anchor.imgX)}, ${Math.round(anchor.imgY)})</strong>
+            <code>${anchor.lat.toFixed(6)}, ${anchor.lng.toFixed(6)}</code>
+          </div>
+          <div class="anchor-tools">
+            <button class="ghost-btn" style="min-height:36px; padding:0 12px;" data-anchor-delete="${anchor.id}">Delete</button>
+          </div>
+        `;
+        els.anchorList.appendChild(row);
+      });
+
+      els.anchorList.querySelectorAll('[data-anchor-delete]').forEach(btn => {
+        btn.addEventListener('click', () => deleteAnchor(btn.dataset.anchorDelete));
+      });
+    }
+
+    function deleteAnchor(id) {
+      state.anchors = state.anchors.filter(anchor => anchor.id !== id);
+      renderAnchorList();
+      renderPreviewAnchors();
+      syncAnchorMarkers();
+      redrawOverlay();
+      updateTopbarTitle();
+      setStatus('Anchor removed.');
+    }
+
+    function syncAnchorMarkers() {
+      if (!state.map || !window.google?.maps) return;
+      state.anchorMarkers.forEach(marker => marker.setMap(null));
+      state.anchorMarkers = state.anchors.map((anchor, idx) => {
+        return new google.maps.Marker({
+          map: state.map,
+          position: { lat: anchor.lat, lng: anchor.lng },
+          clickable: false,
+          label: { text: String(idx + 1), color: '#05230f', fontWeight: '700' },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 11,
+            fillColor: '#22c55e',
+            fillOpacity: 0.92,
+            strokeColor: '#ffffff',
+            strokeWeight: 2
+          },
+          zIndex: 1500
+        });
+      });
+    }
+
+    function syncCaptureButtons() {
+      const show = !!state.pendingImagePoint;
+      els.captureCenterBtn.classList.toggle('hidden', !show);
+      els.captureGpsBtn.classList.toggle('hidden', !show || !state.livePosition);
+    }
+
+    function syncManualUi() {
+      els.opacityValue.textContent = `${Math.round(state.manual.opacity * 100)}%`;
+      els.scaleValue.textContent = `${state.manual.scale.toFixed(2)}×`;
+      els.rotationValue.textContent = `${state.manual.rotationDeg.toFixed(1)}°`;
+      els.nudgeXValue.textContent = `${Math.round(state.manual.offsetX)} px`;
+      els.nudgeYValue.textContent = `${Math.round(state.manual.offsetY)} px`;
+      els.opacitySlider.value = String(Math.round(state.manual.opacity * 100));
+      els.scaleSlider.value = String(state.manual.scale);
+      els.rotationSlider.value = String(state.manual.rotationDeg);
+      els.nudgeXSlider.value = String(Math.round(state.manual.offsetX));
+      els.nudgeYSlider.value = String(Math.round(state.manual.offsetY));
+    }
+
+    function clampNudges() {
+      state.manual.offsetX = Math.max(-120, Math.min(120, state.manual.offsetX));
+      state.manual.offsetY = Math.max(-120, Math.min(120, state.manual.offsetY));
+    }
+
+    function resetAdjustments() {
+      state.manual.scale = 1;
+      state.manual.rotationDeg = 0;
+      state.manual.offsetX = 0;
+      state.manual.offsetY = 0;
+      syncManualUi();
+      redrawOverlay();
+      setStatus('Manual trim reset.');
+    }
+
+    function redrawOverlay() {
+      if (state.overlay) state.overlay.draw();
+    }
+
+    function computeOverlayMatrix(projection) {
+      const pairs = state.anchors.map(anchor => {
+        const pixel = projection.fromLatLngToDivPixel(new google.maps.LatLng(anchor.lat, anchor.lng));
+        return {
+          x: anchor.imgX,
+          y: anchor.imgY,
+          px: pixel.x,
+          py: pixel.y
         };
-    </script>
+      });
+
+      let baseMatrix = null;
+      if (pairs.length >= 3) {
+        baseMatrix = solveAffine(pairs);
+      } else if (pairs.length === 2) {
+        baseMatrix = solveSimilarity(pairs[0], pairs[1]);
+      }
+
+      if (!baseMatrix) return null;
+      return applyManualAdjustments(baseMatrix);
+    }
+
+    function solveSimilarity(a1, a2) {
+      const dxImg = a2.x - a1.x;
+      const dyImg = a2.y - a1.y;
+      const dxMap = a2.px - a1.px;
+      const dyMap = a2.py - a1.py;
+      const imgLen = Math.hypot(dxImg, dyImg);
+      const mapLen = Math.hypot(dxMap, dyMap);
+      if (imgLen < 1e-6 || mapLen < 1e-6) return null;
+
+      const scale = mapLen / imgLen;
+      const angle = Math.atan2(dyMap, dxMap) - Math.atan2(dyImg, dxImg);
+      const cos = Math.cos(angle) * scale;
+      const sin = Math.sin(angle) * scale;
+
+      const matrix = {
+        a: cos,
+        b: sin,
+        c: -sin,
+        d: cos,
+        e: a1.px - (cos * a1.x + (-sin) * a1.y),
+        f: a1.py - (sin * a1.x + cos * a1.y)
+      };
+      return matrix;
+    }
+
+    function solveAffine(points) {
+      const ATA = Array.from({ length: 6 }, () => Array(6).fill(0));
+      const ATb = Array(6).fill(0);
+
+      const addEquation = (row, value) => {
+        for (let i = 0; i < 6; i += 1) {
+          ATb[i] += row[i] * value;
+          for (let j = 0; j < 6; j += 1) {
+            ATA[i][j] += row[i] * row[j];
+          }
+        }
+      };
+
+      points.forEach(p => {
+        addEquation([p.x, p.y, 1, 0, 0, 0], p.px);
+        addEquation([0, 0, 0, p.x, p.y, 1], p.py);
+      });
+
+      const solution = solveLinearSystem(ATA, ATb);
+      if (!solution) return null;
+
+      return {
+        a: solution[0],
+        c: solution[1],
+        e: solution[2],
+        b: solution[3],
+        d: solution[4],
+        f: solution[5]
+      };
+    }
+
+    function solveLinearSystem(matrix, vector) {
+      const n = vector.length;
+      const A = matrix.map((row, i) => [...row, vector[i]]);
+
+      for (let col = 0; col < n; col += 1) {
+        let pivotRow = col;
+        for (let r = col + 1; r < n; r += 1) {
+          if (Math.abs(A[r][col]) > Math.abs(A[pivotRow][col])) pivotRow = r;
+        }
+        if (Math.abs(A[pivotRow][col]) < 1e-10) return null;
+        if (pivotRow !== col) [A[col], A[pivotRow]] = [A[pivotRow], A[col]];
+
+        const pivot = A[col][col];
+        for (let j = col; j <= n; j += 1) A[col][j] /= pivot;
+
+        for (let r = 0; r < n; r += 1) {
+          if (r === col) continue;
+          const factor = A[r][col];
+          if (factor === 0) continue;
+          for (let j = col; j <= n; j += 1) {
+            A[r][j] -= factor * A[col][j];
+          }
+        }
+      }
+
+      return A.map(row => row[n]);
+    }
+
+    function applyManualAdjustments(matrix) {
+      const cx = state.image.width / 2;
+      const cy = state.image.height / 2;
+      const scale = state.manual.scale;
+      const angle = state.manual.rotationDeg * Math.PI / 180;
+      const cos = Math.cos(angle) * scale;
+      const sin = Math.sin(angle) * scale;
+      const m11 = cos;
+      const m12 = -sin;
+      const m21 = sin;
+      const m22 = cos;
+      const shiftX = cx - (m11 * cx + m12 * cy);
+      const shiftY = cy - (m21 * cx + m22 * cy);
+
+      const a = matrix.a * m11 + matrix.c * m21;
+      const c = matrix.a * m12 + matrix.c * m22;
+      const b = matrix.b * m11 + matrix.d * m21;
+      const d = matrix.b * m12 + matrix.d * m22;
+      const e = matrix.a * shiftX + matrix.c * shiftY + matrix.e + state.manual.offsetX;
+      const f = matrix.b * shiftX + matrix.d * shiftY + matrix.f + state.manual.offsetY;
+
+      return { a, b, c, d, e, f };
+    }
+
+    function toggleGps() {
+      if (state.gpsEnabled) {
+        stopGps();
+        return;
+      }
+      if (!navigator.geolocation) {
+        alert('This browser does not support geolocation.');
+        return;
+      }
+
+      state.gpsWatchId = navigator.geolocation.watchPosition(
+        handleGpsPosition,
+        handleGpsError,
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+      );
+
+      state.gpsEnabled = true;
+      syncGpsUi();
+      setStatus('Waiting for GPS lock…');
+    }
+
+    function stopGps() {
+      if (state.gpsWatchId != null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(state.gpsWatchId);
+      }
+      state.gpsWatchId = null;
+      state.gpsEnabled = false;
+      state.livePosition = null;
+      state.headingFromGps = null;
+      state.currentHeading = state.sensorHeading;
+      state.ui.hasCenteredOnGps = false;
+      if (state.gpsMarker) state.gpsMarker.setVisible(false);
+      if (state.accuracyCircle) state.accuracyCircle.setVisible(false);
+      els.latValue.textContent = '—';
+      els.lngValue.textContent = '—';
+      els.accuracyValue.textContent = '—';
+      syncGpsUi();
+      updateHeadingDisplay();
+      syncCaptureButtons();
+      setStatus('GPS disabled.');
+    }
+
+    function syncGpsUi() {
+      els.gpsBtn.classList.toggle('active', state.gpsEnabled);
+      els.locateFab.classList.toggle('active', state.gpsEnabled);
+      els.gpsBtn.textContent = state.gpsEnabled ? 'GPS live' : 'Enable GPS';
+    }
+
+    function handleGpsPosition(position) {
+      state.livePosition = position;
+      const { latitude, longitude, accuracy, heading, speed } = position.coords;
+      const latLng = { lat: latitude, lng: longitude };
+
+      if (state.gpsMarker) {
+        state.gpsMarker.setPosition(latLng);
+        state.gpsMarker.setVisible(true);
+      }
+      if (state.accuracyCircle) {
+        state.accuracyCircle.setCenter(latLng);
+        state.accuracyCircle.setRadius(Math.max(accuracy || 0, 1));
+        state.accuracyCircle.setVisible(true);
+      }
+      if (state.map && (!state.ui.hasCenteredOnGps || accuracy < 40)) {
+        state.map.panTo(latLng);
+        state.ui.hasCenteredOnGps = true;
+      }
+
+      if (Number.isFinite(heading) && heading >= 0 && (speed || 0) > 0.8) {
+        state.headingFromGps = heading;
+      } else {
+        state.headingFromGps = null;
+      }
+      reconcileHeading(accuracy);
+
+      els.latValue.textContent = latitude.toFixed(6);
+      els.lngValue.textContent = longitude.toFixed(6);
+      els.accuracyValue.textContent = `${Math.round(accuracy)} m`;
+      syncCaptureButtons();
+      setStatus(`GPS live • accuracy ${Math.round(accuracy)} m`);
+    }
+
+    function handleGpsError(error) {
+      console.error(error);
+      let message = 'Unable to get your location.';
+      if (error.code === 1) message = 'Location permission was denied.';
+      if (error.code === 2) message = 'Location is unavailable right now.';
+      if (error.code === 3) message = 'Location request timed out.';
+      setStatus(message);
+      alert(message);
+      stopGps();
+    }
+
+    async function toggleCompass() {
+      if (state.compassEnabled) {
+        stopCompass();
+        return;
+      }
+
+      try {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission !== 'granted') {
+            alert('Compass permission was not granted.');
+            return;
+          }
+        }
+      } catch (error) {
+        console.error(error);
+        alert('Compass permission request failed.');
+        return;
+      }
+
+      attachCompassListeners();
+      state.compassEnabled = true;
+      syncCompassUi();
+      setStatus('Compass enabled. Rotate the phone to update heading.');
+    }
+
+    function attachCompassListeners() {
+      if (state.compassListenerAttached) return;
+      const handler = event => {
+        let heading = null;
+        if (typeof event.webkitCompassHeading === 'number') {
+          heading = event.webkitCompassHeading;
+        } else if (typeof event.alpha === 'number') {
+          heading = (360 - event.alpha + 360) % 360;
+        }
+        if (heading == null || Number.isNaN(heading)) return;
+        state.sensorHeading = smoothHeading(state.sensorHeading, heading, 0.18);
+        const accuracy = state.livePosition?.coords?.accuracy ?? Infinity;
+        reconcileHeading(accuracy);
+      };
+      window.addEventListener('deviceorientationabsolute', handler, true);
+      window.addEventListener('deviceorientation', handler, true);
+      state._orientationHandler = handler;
+      state.compassListenerAttached = true;
+    }
+
+    function stopCompass() {
+      if (state._orientationHandler) {
+        window.removeEventListener('deviceorientationabsolute', state._orientationHandler, true);
+        window.removeEventListener('deviceorientation', state._orientationHandler, true);
+      }
+      state.compassListenerAttached = false;
+      state._orientationHandler = null;
+      state.compassEnabled = false;
+      state.sensorHeading = null;
+      state.currentHeading = state.headingFromGps;
+      syncCompassUi();
+      updateHeadingDisplay();
+      if (state.map?.setHeading) state.map.setHeading(0);
+      setStatus('Compass disabled.');
+    }
+
+    function syncCompassUi() {
+      els.compassBtn.classList.toggle('active', state.compassEnabled);
+      els.compassFab.classList.toggle('active', state.compassEnabled);
+      els.compassBtn.textContent = state.compassEnabled ? 'Compass live' : 'Enable compass';
+    }
+
+    function smoothHeading(previous, next, alpha = 0.2) {
+      if (previous == null) return next;
+      let delta = ((next - previous + 540) % 360) - 180;
+      return (previous + delta * alpha + 360) % 360;
+    }
+
+    function reconcileHeading(locationAccuracy) {
+      const heading = state.headingFromGps ?? state.sensorHeading;
+      state.currentHeading = heading ?? null;
+      updateHeadingDisplay();
+
+      const canRotateMap = state.compassEnabled && Number.isFinite(heading) && locationAccuracy <= 35 && state.map?.setHeading;
+      if (canRotateMap) {
+        state.map.setHeading(heading);
+      } else if (state.map?.setHeading) {
+        state.map.setHeading(0);
+      }
+    }
+
+    function updateHeadingDisplay() {
+      if (Number.isFinite(state.currentHeading)) {
+        els.headingValue.textContent = `${Math.round(state.currentHeading)}°`;
+      } else {
+        els.headingValue.textContent = '—';
+      }
+    }
+
+    function setStatus(message) {
+      els.modeStatus.textContent = message;
+    }
+
+    function updateTopbarTitle() {
+      let text = 'Map ready • add anchors';
+      if (state.interactionMode === 'pick-image-point') text = 'Pick a point on the image';
+      if (state.interactionMode === 'await-geo-point') text = 'Capture the matching map point';
+      if (state.anchors.length >= 2) text = `Overlay live • ${state.anchors.length} anchors`;
+      els.topbarTitle.textContent = text;
+    }
+
+    function exportState() {
+      if (!state.image.url) {
+        alert('Load a floorplan first.');
+        return;
+      }
+      const payload = {
+        version: 2,
+        image: state.image,
+        anchors: state.anchors,
+        manual: state.manual,
+        map: state.map ? {
+          center: {
+            lat: state.map.getCenter()?.lat() ?? 39.7392,
+            lng: state.map.getCenter()?.lng() ?? -104.9903
+          },
+          zoom: state.map.getZoom() ?? 19,
+          heading: state.map.getHeading?.() ?? 0,
+          mapTypeId: state.map.getMapTypeId?.() ?? 'satellite'
+        } : null
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const baseName = (state.image.name || 'alignment').replace(/\.[^.]+$/, '');
+      a.href = url;
+      a.download = `${baseName}.align`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setStatus('Alignment exported.');
+    }
+
+    function importStateFile(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const payload = JSON.parse(String(reader.result));
+          if (!payload?.image?.url || !payload?.image?.width || !payload?.image?.height) {
+            throw new Error('Missing image payload.');
+          }
+          state.image = {
+            url: payload.image.url,
+            width: payload.image.width,
+            height: payload.image.height,
+            name: payload.image.name || 'imported-floorplan'
+          };
+          state.anchors = Array.isArray(payload.anchors) ? payload.anchors.map(a => ({ id: a.id || cryptoRandomId(), imgX: a.imgX, imgY: a.imgY, lat: a.lat, lng: a.lng })) : [];
+          state.manual = {
+            opacity: Number(payload.manual?.opacity ?? 0.75),
+            scale: Number(payload.manual?.scale ?? 1),
+            rotationDeg: Number(payload.manual?.rotationDeg ?? 0),
+            offsetX: Number(payload.manual?.offsetX ?? 0),
+            offsetY: Number(payload.manual?.offsetY ?? 0)
+          };
+          els.imagePreview.src = state.image.url;
+          syncManualUi();
+          renderPreviewAnchors();
+          renderAnchorList();
+          syncAnchorMarkers();
+          redrawOverlay();
+
+          if (state.map && payload.map) {
+            state.map.setMapTypeId(payload.map.mapTypeId || 'satellite');
+            state.map.setZoom(payload.map.zoom || 19);
+            state.map.setCenter(payload.map.center || { lat: 39.7392, lng: -104.9903 });
+            if (typeof payload.map.heading === 'number' && state.map.setHeading) state.map.setHeading(payload.map.heading);
+          }
+
+          updateTopbarTitle();
+          setStatus('Alignment imported.');
+        } catch (error) {
+          console.error(error);
+          alert('That .align file could not be read.');
+        } finally {
+          els.importInput.value = '';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetAll() {
+      if (!confirm('Reset the floorplan, anchors, and adjustments?')) return;
+      state.image = { url: '', width: 0, height: 0, name: '' };
+      state.anchors = [];
+      state.pendingImagePoint = null;
+      state.interactionMode = 'idle';
+      state.manual = { opacity: 0.75, scale: 1, rotationDeg: 0, offsetX: 0, offsetY: 0 };
+      els.fileInput.value = '';
+      els.imagePreview.removeAttribute('src');
+      syncManualUi();
+      renderAnchorList();
+      renderPreviewAnchors();
+      syncAnchorMarkers();
+      redrawOverlay();
+      updateTopbarTitle();
+      syncCaptureButtons();
+      setStatus('All alignment data reset.');
+    }
+
+    document.addEventListener('DOMContentLoaded', boot);
+  </script>
 </body>
 </html>
